@@ -1,10 +1,25 @@
+// Copyright 2013-2023 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -84,12 +99,12 @@ func TestFishCompletionNoActiveHelp(t *testing.T) {
 }
 
 func TestGenFishCompletionFile(t *testing.T) {
-	err := os.Mkdir("./tmp", 0755)
+	tmpFile, err := os.CreateTemp("", "cobra-test")
 	if err != nil {
-		log.Fatal(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	defer os.RemoveAll("./tmp")
+	defer os.Remove(tmpFile.Name())
 
 	rootCmd := &Command{Use: "root", Args: NoArgs, Run: emptyRun}
 	child := &Command{
@@ -99,18 +114,18 @@ func TestGenFishCompletionFile(t *testing.T) {
 	}
 	rootCmd.AddCommand(child)
 
-	assertNoErr(t, rootCmd.GenFishCompletionFile("./tmp/test", false))
+	assertNoErr(t, rootCmd.GenFishCompletionFile(tmpFile.Name(), false))
 }
 
 func TestFailGenFishCompletionFile(t *testing.T) {
-	err := os.Mkdir("./tmp", 0755)
+	tmpDir, err := os.MkdirTemp("", "cobra-test")
 	if err != nil {
-		log.Fatal(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	defer os.RemoveAll("./tmp")
+	defer os.RemoveAll(tmpDir)
 
-	f, _ := os.OpenFile("./tmp/test", os.O_CREATE, 0400)
+	f, _ := os.OpenFile(filepath.Join(tmpDir, "test"), os.O_CREATE, 0400)
 	defer f.Close()
 
 	rootCmd := &Command{Use: "root", Args: NoArgs, Run: emptyRun}
@@ -121,18 +136,8 @@ func TestFailGenFishCompletionFile(t *testing.T) {
 	}
 	rootCmd.AddCommand(child)
 
-	got := rootCmd.GenFishCompletionFile("./tmp/test", false)
-	if got == nil {
-		t.Error("should raise permission denied error")
-	}
-
-	if os.Getenv("MSYSTEM") == "MINGW64" {
-		if got.Error() != "open ./tmp/test: Access is denied." {
-			t.Errorf("got: %s, want: %s", got.Error(), "open ./tmp/test: Access is denied.")
-		}
-	} else {
-		if got.Error() != "open ./tmp/test: permission denied" {
-			t.Errorf("got: %s, want: %s", got.Error(), "open ./tmp/test: permission denied")
-		}
+	got := rootCmd.GenFishCompletionFile(f.Name(), false)
+	if !errors.Is(got, os.ErrPermission) {
+		t.Errorf("got: %s, want: %s", got.Error(), os.ErrPermission.Error())
 	}
 }
