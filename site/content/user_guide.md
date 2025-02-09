@@ -3,14 +3,14 @@
 While you are welcome to provide your own organization, typically a Cobra-based
 application will follow the following organizational structure:
 
-```
-  ▾ appName/
-    ▾ cmd/
-        add.go
-        your.go
-        commands.go
-        here.go
-      main.go
+```console
+▾ appName/
+  ▾ cmd/
+      add.go
+      your.go
+      commands.go
+      here.go
+  main.go
 ```
 
 In a Cobra app, typically the main.go file is very bare. It serves one purpose: initializing Cobra.
@@ -18,9 +18,7 @@ In a Cobra app, typically the main.go file is very bare. It serves one purpose: 
 ```go
 package main
 
-import (
-  "{pathToYourApp}/cmd"
-)
+import "{pathToYourApp}/cmd"
 
 func main() {
   cmd.Execute()
@@ -29,8 +27,8 @@ func main() {
 
 ## Using the Cobra Generator
 
-Cobra-CLI is its own program that will create your application and add any
-commands you want. It's the easiest way to incorporate Cobra into your application.
+Cobra-CLI is its own program that will create your application and add any commands you want.
+It's the easiest way to incorporate Cobra into your application.
 
 For complete details on using the Cobra generator, please refer to [The Cobra-CLI Generator README](https://github.com/spf13/cobra-cli/blob/main/README.md)
 
@@ -148,9 +146,7 @@ In a Cobra app, typically the main.go file is very bare. It serves one purpose: 
 ```go
 package main
 
-import (
-  "{pathToYourApp}/cmd"
-)
+import "{pathToYourApp}/cmd"
 
 func main() {
   cmd.Execute()
@@ -187,6 +183,37 @@ var versionCmd = &cobra.Command{
   },
 }
 ```
+
+### Organizing subcommands
+
+A command may have subcommands which in turn may have other subcommands. This is achieved by using
+`AddCommand`. In some cases, especially in larger applications, each subcommand may be defined in
+its own go package.
+
+The suggested approach is for the parent command to use `AddCommand` to add its most immediate
+subcommands. For example, consider the following directory structure:
+
+```console
+├── cmd
+│   ├── root.go
+│   └── sub1
+│       ├── sub1.go
+│       └── sub2
+│           ├── leafA.go
+│           ├── leafB.go
+│           └── sub2.go
+└── main.go
+```
+
+In this case:
+
+* The `init` function of `root.go` adds the command defined in `sub1.go` to the root command.
+* The `init` function of `sub1.go` adds the command defined in `sub2.go` to the sub1 command.
+* The `init` function of `sub2.go` adds the commands defined in `leafA.go` and `leafB.go` to the
+  sub2 command.
+
+This approach ensures the subcommands are always included at compile time while avoiding cyclic
+references.
 
 ### Returning and handling errors
 
@@ -270,6 +297,7 @@ command := cobra.Command{
 ### Bind Flags with Config
 
 You can also bind your flags with [viper](https://github.com/spf13/viper):
+
 ```go
 var author string
 
@@ -289,12 +317,14 @@ More in [viper documentation](https://github.com/spf13/viper#working-with-flags)
 
 Flags are optional by default. If instead you wish your command to report an error
 when a flag has not been set, mark it as required:
+
 ```go
 rootCmd.Flags().StringVarP(&Region, "region", "r", "", "AWS region (required)")
 rootCmd.MarkFlagRequired("region")
 ```
 
 Or, for persistent flags:
+
 ```go
 rootCmd.PersistentFlags().StringVarP(&Region, "region", "r", "", "AWS region (required)")
 rootCmd.MarkPersistentFlagRequired("region")
@@ -302,23 +332,35 @@ rootCmd.MarkPersistentFlagRequired("region")
 
 ### Flag Groups
 
-If you have different flags that must be provided together (e.g. if they provide the `--username` flag they MUST provide the `--password` flag as well) then 
+If you have different flags that must be provided together (e.g. if they provide the `--username` flag they MUST provide the `--password` flag as well) then
 Cobra can enforce that requirement:
+
 ```go
 rootCmd.Flags().StringVarP(&u, "username", "u", "", "Username (required if password is set)")
 rootCmd.Flags().StringVarP(&pw, "password", "p", "", "Password (required if username is set)")
 rootCmd.MarkFlagsRequiredTogether("username", "password")
-``` 
+```
 
-You can also prevent different flags from being provided together if they represent mutually 
+You can also prevent different flags from being provided together if they represent mutually
 exclusive options such as specifying an output format as either `--json` or `--yaml` but never both:
+
 ```go
-rootCmd.Flags().BoolVar(&u, "json", false, "Output in JSON")
-rootCmd.Flags().BoolVar(&pw, "yaml", false, "Output in YAML")
+rootCmd.Flags().BoolVar(&ofJson, "json", false, "Output in JSON")
+rootCmd.Flags().BoolVar(&ofYaml, "yaml", false, "Output in YAML")
 rootCmd.MarkFlagsMutuallyExclusive("json", "yaml")
 ```
 
-In both of these cases:
+If you want to require at least one flag from a group to be present, you can use `MarkFlagsOneRequired`.
+This can be combined with `MarkFlagsMutuallyExclusive` to enforce exactly one flag from a given group:
+
+```go
+rootCmd.Flags().BoolVar(&ofJson, "json", false, "Output in JSON")
+rootCmd.Flags().BoolVar(&ofYaml, "yaml", false, "Output in YAML")
+rootCmd.MarkFlagsOneRequired("json", "yaml")
+rootCmd.MarkFlagsMutuallyExclusive("json", "yaml")
+```
+
+In these cases:
   - both local and persistent flags can be used
     - **NOTE:** the group is only enforced on commands where every flag is defined
   - a flag may appear in multiple groups
@@ -327,29 +369,47 @@ In both of these cases:
 ## Positional and Custom Arguments
 
 Validation of positional arguments can be specified using the `Args` field of `Command`.
-If `Args` is undefined or `nil`, it defaults to `ArbitraryArgs`.
-
 The following validators are built in:
 
-- `NoArgs` - the command will report an error if there are any positional args.
-- `ArbitraryArgs` - the command will accept any args.
-- `OnlyValidArgs` - the command will report an error if there are any positional args that are not in the `ValidArgs` field of `Command`.
-- `MinimumNArgs(int)` - the command will report an error if there are not at least N positional args.
-- `MaximumNArgs(int)` - the command will report an error if there are more than N positional args.
-- `ExactArgs(int)` - the command will report an error if there are not exactly N positional args.
-- `ExactValidArgs(int)` - the command will report an error if there are not exactly N positional args OR if there are any positional args that are not in the `ValidArgs` field of `Command`
-- `RangeArgs(min, max)` - the command will report an error if the number of args is not between the minimum and maximum number of expected args.
-- `MatchAll(pargs ...PositionalArgs)` - enables combining existing checks with arbitrary other checks (e.g. you want to check the ExactArgs length along with other qualities).
+- Number of arguments:
+  - `NoArgs` - report an error if there are any positional args.
+  - `ArbitraryArgs` - accept any number of args.
+  - `MinimumNArgs(int)` - report an error if less than N positional args are provided.
+  - `MaximumNArgs(int)` - report an error if more than N positional args are provided.
+  - `ExactArgs(int)` - report an error if there are not exactly N positional args.
+  - `RangeArgs(min, max)` - report an error if the number of args is not between `min` and `max`.
+- Content of the arguments:
+  - `OnlyValidArgs` - report an error if there are any positional args not specified in the `ValidArgs` field of `Command`, which can optionally be set to a list of valid values for positional args.
 
-An example of setting the custom validator:
+If `Args` is undefined or `nil`, it defaults to `ArbitraryArgs`.
+
+Moreover, `MatchAll(pargs ...PositionalArgs)` enables combining existing checks with arbitrary other checks.
+For instance, if you want to report an error if there are not exactly N positional args OR if there are any positional
+args that are not in the `ValidArgs` field of `Command`, you can call `MatchAll` on `ExactArgs` and `OnlyValidArgs`, as
+shown below:
+
+```go
+var cmd = &cobra.Command{
+  Short: "hello",
+  Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+  Run: func(cmd *cobra.Command, args []string) {
+    fmt.Println("Hello, World!")
+  },
+}
+```
+
+It is possible to set any custom validator that satisfies `func(cmd *cobra.Command, args []string) error`.
+For example:
 
 ```go
 var cmd = &cobra.Command{
   Short: "hello",
   Args: func(cmd *cobra.Command, args []string) error {
-    if len(args) < 1 {
-      return errors.New("requires a color argument")
+    // Optionally run one of the validators provided by cobra
+    if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
+        return err
     }
+    // Run the custom validation logic
     if myapp.IsValidColor(args[0]) {
       return nil
     }
@@ -370,7 +430,7 @@ by not providing a 'Run' for the 'rootCmd'.
 
 We have only defined one flag for a single command.
 
-More documentation about flags is available at https://github.com/spf13/pflag
+More documentation about flags is available at https://github.com/spf13/pflag.
 
 ```go
 package main
@@ -444,37 +504,47 @@ create' is called.  Every command will automatically have the '--help' flag adde
 The following output is automatically generated by Cobra. Nothing beyond the
 command and flag definitions are needed.
 
-    $ cobra help
+```console
+$ cobra-cli help
 
-    Cobra is a CLI library for Go that empowers applications.
-    This application is a tool to generate the needed files
-    to quickly create a Cobra application.
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.
 
-    Usage:
-      cobra [command]
+Usage:
+  cobra-cli [command]
 
-    Available Commands:
-      add         Add a command to a Cobra Application
-      help        Help about any command
-      init        Initialize a Cobra Application
+Available Commands:
+  add         Add a command to a Cobra Application
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  init        Initialize a Cobra Application
 
-    Flags:
-      -a, --author string    author name for copyright attribution (default "YOUR NAME")
-          --config string    config file (default is $HOME/.cobra.yaml)
-      -h, --help             help for cobra
-      -l, --license string   name of license for the project
-          --viper            use Viper for configuration (default true)
+Flags:
+  -a, --author string    author name for copyright attribution (default "YOUR NAME")
+      --config string    config file (default is $HOME/.cobra.yaml)
+  -h, --help             help for cobra-cli
+  -l, --license string   name of license for the project
+      --viper            use Viper for configuration
 
-    Use "cobra [command] --help" for more information about a command.
-
+Use "cobra-cli [command] --help" for more information about a command.
+```
 
 Help is just a command like any other. There is no special logic or behavior
 around it. In fact, you can provide your own if you want.
 
+### Grouping commands in help
+
+Cobra supports grouping of available commands in the help output.  To group commands, each group must be explicitly
+defined using `AddGroup()` on the parent command.  Then a subcommand can be added to a group using the `GroupID` element
+of that subcommand. The groups will appear in the help output in the same order as they are defined using different
+calls to `AddGroup()`.  If you use the generated `help` or `completion` commands, you can set their group ids using
+`SetHelpCommandGroupId()` and `SetCompletionCommandGroupId()` on the root command, respectively.
+
 ### Defining your own help
 
 You can provide your own Help command or your own template for the default command to use
-with following functions:
+with the following functions:
 
 ```go
 cmd.SetHelpCommand(cmd *Command)
@@ -483,6 +553,9 @@ cmd.SetHelpTemplate(s string)
 ```
 
 The latter two will also apply to any children commands.
+
+Note that templates specified with `SetHelpTemplate` are evaluated using
+`text/template` which can increase the size of the compiled executable.
 
 ## Usage Message
 
@@ -493,26 +566,30 @@ showing the user the 'usage'.
 You may recognize this from the help above. That's because the default help
 embeds the usage as part of its output.
 
-    $ cobra --invalid
-    Error: unknown flag: --invalid
-    Usage:
-      cobra [command]
+```console
+$ cobra-cli --invalid
+Error: unknown flag: --invalid
+Usage:
+  cobra-cli [command]
 
-    Available Commands:
-      add         Add a command to a Cobra Application
-      help        Help about any command
-      init        Initialize a Cobra Application
+Available Commands:
+  add         Add a command to a Cobra Application
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  init        Initialize a Cobra Application
 
-    Flags:
-      -a, --author string    author name for copyright attribution (default "YOUR NAME")
-          --config string    config file (default is $HOME/.cobra.yaml)
-      -h, --help             help for cobra
-      -l, --license string   name of license for the project
-          --viper            use Viper for configuration (default true)
+Flags:
+  -a, --author string    author name for copyright attribution (default "YOUR NAME")
+      --config string    config file (default is $HOME/.cobra.yaml)
+  -h, --help             help for cobra-cli
+  -l, --license string   name of license for the project
+      --viper            use Viper for configuration
 
-    Use "cobra [command] --help" for more information about a command.
+Use "cobra [command] --help" for more information about a command.
+```
 
 ### Defining your own usage
+
 You can provide your own usage function or template for Cobra to use.
 Like help, the function and template are overridable through public methods:
 
@@ -521,6 +598,9 @@ cmd.SetUsageFunc(f func(*Command) error)
 cmd.SetUsageTemplate(s string)
 ```
 
+Note that templates specified with `SetUsageTemplate` are evaluated using
+`text/template` which can increase the size of the compiled executable.
+
 ## Version Flag
 
 Cobra adds a top-level '--version' flag if the Version field is set on the root command.
@@ -528,9 +608,18 @@ Running an application with the '--version' flag will print the version to stdou
 the version template. The template can be customized using the
 `cmd.SetVersionTemplate(s string)` function.
 
+Note that templates specified with `SetVersionTemplate` are evaluated using
+`text/template` which can increase the size of the compiled executable.
+
+## Error Message Prefix
+
+Cobra prints an error message when receiving a non-nil error value.
+The default error message is `Error: <error contents>`.
+The Prefix, `Error:` can be customized using the `cmd.SetErrPrefix(s string)` function.
+
 ## PreRun and PostRun Hooks
 
-It is possible to run functions before or after the main `Run` function of your command. The `PersistentPreRun` and `PreRun` functions will be executed before `Run`. `PersistentPostRun` and `PostRun` will be executed after `Run`.  The `Persistent*Run` functions will be inherited by children if they do not declare their own.  These functions are run in the following order:
+It is possible to run functions before or after the main `Run` function of your command. The `PersistentPreRun` and `PreRun` functions will be executed before `Run`. `PersistentPostRun` and `PostRun` will be executed after `Run`.  The `Persistent*Run` functions will be inherited by children if they do not declare their own.  The `*PreRun` and `*PostRun` functions will only be executed if the `Run` function of the current command has been declared.  These functions are run in the following order:
 
 - `PersistentPreRun`
 - `PreRun`
@@ -613,11 +702,15 @@ Inside subCmd PostRun with args: [arg1 arg2]
 Inside subCmd PersistentPostRun with args: [arg1 arg2]
 ```
 
+By default, only the first persistent hook found in the command chain is executed.
+That is why in the above output, the `rootCmd PersistentPostRun` was not called for a child command.
+Set `EnableTraverseRunHooks` global variable to `true` if you want to execute all parents' persistent hooks.
+
 ## Suggestions when "unknown command" happens
 
 Cobra will print automatic suggestions when "unknown command" errors happen. This allows Cobra to behave similarly to the `git` command when a typo happens. For example:
 
-```
+```console
 $ hugo srever
 Error: unknown command "srever" for "hugo"
 
@@ -627,7 +720,7 @@ Did you mean this?
 Run 'hugo --help' for usage.
 ```
 
-Suggestions are automatic based on every subcommand registered and use an implementation of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). Every registered command that matches a minimum distance of 2 (ignoring case) will be displayed as a suggestion.
+Suggestions are automatically generated based on existing subcommands and use an implementation of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). Every registered command that matches a minimum distance of 2 (ignoring case) will be displayed as a suggestion.
 
 If you need to disable suggestions or tweak the string distance in your command, use:
 
@@ -641,9 +734,10 @@ or
 command.SuggestionsMinimumDistance = 1
 ```
 
-You can also explicitly set names for which a given command will be suggested using the `SuggestFor` attribute. This allows suggestions for strings that are not close in terms of string distance, but makes sense in your set of commands and for some which you don't want aliases. Example:
+You can also explicitly set names for which a given command will be suggested using the `SuggestFor` attribute. This allows suggestions for strings that are not close in terms of string distance, but make sense in your set of commands but for which
+you don't want aliases. Example:
 
-```
+```console
 $ kubectl remove
 Error: unknown command "remove" for "kubectl"
 
@@ -655,12 +749,71 @@ Run 'kubectl help' for usage.
 
 ## Generating documentation for your command
 
-Cobra can generate documentation based on subcommands, flags, etc. Read more about it in the [docs generation documentation](doc/README.md).
+Cobra can generate documentation based on subcommands, flags, etc.
+Read more about it in the [docs generation documentation](docgen/_index.md).
 
 ## Generating shell completions
 
-Cobra can generate a shell-completion file for the following shells: bash, zsh, fish, PowerShell. If you add more information to your commands, these completions can be amazingly powerful and flexible.  Read more about it in [Shell Completions](shell_completions.md).
+Cobra can generate a shell-completion file for the following shells: bash, zsh, fish, PowerShell.
+If you add more information to your commands, these completions can be amazingly powerful and flexible.
+Read more about it in [Shell Completions](completions/_index.md).
 
 ## Providing Active Help
 
-Cobra makes use of the shell-completion system to define a framework allowing you to provide Active Help to your users.  Active Help are messages (hints, warnings, etc) printed as the program is being used.  Read more about it in [Active Help](active_help.md).
+Cobra makes use of the shell-completion system to define a framework allowing you to provide Active Help to your users.
+Active Help are messages (hints, warnings, etc) printed as the program is being used.
+Read more about it in [Active Help](active_help.md).
+
+## Creating a plugin
+
+When creating a plugin for tools like *kubectl*, the executable is named
+`kubectl-myplugin`, but it is used as `kubectl myplugin`. To fix help
+messages and completions, annotate the root command with the
+`cobra.CommandDisplayNameAnnotation` annotation.
+
+### Example kubectl plugin
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
+
+func main() {
+	rootCmd := &cobra.Command{
+		Use: "kubectl-myplugin",
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "kubectl myplugin",
+		},
+	}
+	subCmd := &cobra.Command{
+		Use: "subcmd",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("kubectl myplugin subcmd")
+		},
+	}
+	rootCmd.AddCommand(subCmd)
+	rootCmd.Execute()
+}
+```
+
+Example run as a kubectl plugin:
+
+```console
+$ kubectl myplugin
+Usage:
+  kubectl myplugin [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  subcmd
+
+Flags:
+  -h, --help   help for kubectl myplugin
+
+Use "kubectl myplugin [command] --help" for more information about a command.
+```
