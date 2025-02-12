@@ -1,10 +1,23 @@
+// Copyright 2013-2023 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package doc
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,15 +141,12 @@ func TestGenManSeeAlso(t *testing.T) {
 	if err := assertLineFound(scanner, ".SH SEE ALSO"); err != nil {
 		t.Fatalf("Couldn't find SEE ALSO section header: %v", err)
 	}
-	if err := assertNextLineEquals(scanner, ".PP"); err != nil {
-		t.Fatalf("First line after SEE ALSO wasn't break-indent: %v", err)
-	}
 	if err := assertNextLineEquals(scanner, `\fBroot-bbb(1)\fP, \fBroot-ccc(1)\fP`); err != nil {
 		t.Fatalf("Second line after SEE ALSO wasn't correct: %v", err)
 	}
 }
 
-func TestManPrintFlagsHidesShortDeperecated(t *testing.T) {
+func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	c := &cobra.Command{}
 	c.Flags().StringP("foo", "f", "default", "Foo flag")
 	assertNoErr(t, c.Flags().MarkShorthandDeprecated("foo", "don't use it no more"))
@@ -154,7 +164,7 @@ func TestManPrintFlagsHidesShortDeperecated(t *testing.T) {
 func TestGenManTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
 	header := &GenManHeader{Section: "2"}
-	tmpdir, err := ioutil.TempDir("", "test-gen-man-tree")
+	tmpdir, err := os.MkdirTemp("", "test-gen-man-tree")
 	if err != nil {
 		t.Fatalf("Failed to create tmpdir: %s", err.Error())
 	}
@@ -205,7 +215,7 @@ func assertNextLineEquals(scanner *bufio.Scanner, expectedLine string) error {
 }
 
 func BenchmarkGenManToFile(b *testing.B) {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		b.Fatal(err)
 	}

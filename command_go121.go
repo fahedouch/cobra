@@ -1,4 +1,4 @@
-// Copyright 2013-2023 The Cobra Authors
+// Copyright 2013-2024 The Cobra Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !windows
-// +build !windows
+//go:build go1.21
+// +build go1.21
 
 package cobra
 
-var preExecHookFn func(*Command)
+import "testing"
+
+func isTesting() bool {
+	// Only available starting with go 1.21
+	return testing.Testing()
+}
